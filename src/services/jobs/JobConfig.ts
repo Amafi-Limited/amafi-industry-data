@@ -7,7 +7,8 @@ export type JobType =
   | 'industry'
   | 'competitors'
   | 'supply'
-  | 'demand';
+  | 'demand'
+  | 'regulations';
 
 export interface JobTypeConfig {
   displayName: string;
@@ -103,6 +104,27 @@ export const JOB_TYPE_CONFIGS: Record<JobType, JobTypeConfig> = {
       identifyingDrivers: 40,
       assessingGrowth: 60,
       forecastingDemand: 75,
+      saving: 90,
+      complete: 100
+    }
+  },
+  
+  regulations: {
+    displayName: 'Regulatory Analysis',
+    estimatedDuration: {
+      regular: '30-60 seconds',
+      deepResearch: '2-3 minutes'
+    },
+    timeout: {
+      regular: 300000,
+      deepResearch: 600000
+    },
+    progressSteps: {
+      start: 10,
+      analyzingRegulations: 25,
+      assessingCompliance: 45,
+      identifyingChanges: 65,
+      evaluatingImpact: 80,
       saving: 90,
       complete: 100
     }

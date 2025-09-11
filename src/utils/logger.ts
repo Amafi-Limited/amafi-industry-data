@@ -33,7 +33,7 @@ export const logger = winston.createLogger({
           msg += ` ${safeMetadata}`;
         } catch (error) {
           // Fallback if stringify still fails
-          msg += ` [Metadata stringify error: ${error.message}]`;
+          msg += ` [Metadata stringify error: ${error instanceof Error ? error.message : String(error)}]`;
         }
       }
       return msg;
