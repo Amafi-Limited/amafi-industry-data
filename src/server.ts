@@ -1,15 +1,15 @@
+import dotenv from 'dotenv';
+// Load environment variables FIRST before any other imports
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { logger } from './utils/logger';
 import { jobQueue } from './services/jobs/JobQueue';
 import { WebSocketService } from './services/jobs/WebSocketService';
 import industryAsyncRoutes from './routes/industryAsync';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3002;

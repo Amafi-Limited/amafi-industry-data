@@ -6,8 +6,8 @@
 export type JobType = 
   | 'industry'
   | 'competitors'
-  | 'supply'
-  | 'demand'
+  | 'supplychain'
+  | 'endmarkets'
   | 'regulations';
 
 export interface JobTypeConfig {
@@ -67,8 +67,8 @@ export const JOB_TYPE_CONFIGS: Record<JobType, JobTypeConfig> = {
     }
   },
   
-  supply: {
-    displayName: 'Supply Analysis',
+  supplychain: {
+    displayName: 'Supply Chain Analysis',
     estimatedDuration: {
       regular: '40-80 seconds',
       deepResearch: '3-4 minutes'
@@ -88,8 +88,8 @@ export const JOB_TYPE_CONFIGS: Record<JobType, JobTypeConfig> = {
     }
   },
   
-  demand: {
-    displayName: 'Demand Analysis',
+  endmarkets: {
+    displayName: 'End Markets Analysis',
     estimatedDuration: {
       regular: '40-80 seconds',
       deepResearch: '3-4 minutes'

@@ -12,8 +12,15 @@ export class SupabaseService {
       throw new Error('Missing Supabase environment variables');
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
-    logger.info('✅ Supabase client initialized');
+    this.supabase = createClient(supabaseUrl, supabaseKey, {
+      db: {
+        schema: 'public'
+      },
+      auth: {
+        persistSession: false
+      }
+    });
+    logger.info('✅ Supabase client initialized with fresh schema');
   }
 
   /**
@@ -87,63 +94,103 @@ export class SupabaseService {
   }
 
   /**
-   * Get supply data
+   * Save a single industry competitor
    */
-  async getIndustrySupply(entityId: string) {
-    const { data, error } = await this.supabase
-      .from('industry_supply')
-      .select('*')
-      .eq('entity_id', entityId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      logger.error('Error fetching supply data:', error);
-    }
-    
-    return data;
-  }
-
-  /**
-   * Save supply data
-   */
-  async saveIndustrySupply(data: any) {
+  async saveIndustryCompetitor(competitor: any) {
+    // Simply insert without upsert since we don't have a unique constraint on competitor_name
+    // Each competitor should be a new record
     const { error } = await this.supabase
-      .from('industry_supply')
-      .upsert(data, { onConflict: 'entity_id' });
+      .from('industry_competitors')
+      .insert(competitor);
 
     if (error) {
-      logger.error('Error saving supply data:', error);
+      logger.error('Error saving competitor:', error);
       throw error;
     }
   }
 
   /**
-   * Get demand data
+   * Get supply chain data
    */
-  async getIndustryDemand(entityId: string) {
+  async getIndustrySupplyChain(entityId: string) {
     const { data, error } = await this.supabase
-      .from('industry_demand')
+      .from('industry_supplychain')
       .select('*')
       .eq('entity_id', entityId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      logger.error('Error fetching demand data:', error);
+      logger.error('Error fetching supply chain data:', error);
     }
     
     return data;
   }
 
   /**
-   * Save demand data
+   * Save supply chain data
    */
-  async saveIndustryDemand(data: any) {
+  async saveIndustrySupplyChain(data: any) {
+    // First delete existing data for this entity
+    const { error: deleteError } = await this.supabase
+      .from('industry_supplychain')
+      .delete()
+      .eq('entity_id', data.entity_id)
+      .eq('profile_id', data.profile_id);
+    
+    if (deleteError) {
+      logger.error('Error deleting existing supply chain data:', deleteError);
+    }
+
+    // Then insert new data
     const { error } = await this.supabase
-      .from('industry_demand')
-      .upsert(data, { onConflict: 'entity_id' });
+      .from('industry_supplychain')
+      .insert(data);
 
     if (error) {
-      logger.error('Error saving demand data:', error);
+      logger.error('Error saving supply chain data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get end markets data
+   */
+  async getIndustryEndMarkets(entityId: string) {
+    const { data, error } = await this.supabase
+      .from('industry_endmarkets')
+      .select('*')
+      .eq('entity_id', entityId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      logger.error('Error fetching end markets data:', error);
+    }
+    
+    return data;
+  }
+
+  /**
+   * Save end markets data
+   */
+  async saveIndustryEndMarkets(data: any) {
+    // First delete existing data for this entity
+    const { error: deleteError } = await this.supabase
+      .from('industry_endmarkets')
+      .delete()
+      .eq('entity_id', data.entity_id)
+      .eq('profile_id', data.profile_id);
+    
+    if (deleteError) {
+      logger.error('Error deleting existing end markets data:', deleteError);
+    }
+
+    // Then insert new data
+    const { error } = await this.supabase
+      .from('industry_endmarkets')
+      .insert(data);
+
+    if (error) {
+      logger.error('Error saving end markets data:', error);
       throw error;
     }
   }
@@ -169,9 +216,21 @@ export class SupabaseService {
    * Save regulations data
    */
   async saveIndustryRegulations(data: any) {
+    // First delete existing data for this entity
+    const { error: deleteError } = await this.supabase
+      .from('industry_regulations')
+      .delete()
+      .eq('entity_id', data.entity_id)
+      .eq('profile_id', data.profile_id);
+    
+    if (deleteError) {
+      logger.error('Error deleting existing regulations data:', deleteError);
+    }
+
+    // Then insert new data
     const { error } = await this.supabase
       .from('industry_regulations')
-      .upsert(data, { onConflict: 'entity_id' });
+      .insert(data);
 
     if (error) {
       logger.error('Error saving regulations:', error);
@@ -207,16 +266,29 @@ export const getSupabaseService = (): SupabaseService => {
   return _supabaseService;
 };
 
-// For backward compatibility
+// Export methods for backward compatibility
 export const supabaseService = {
+  // Industry Overview methods
   getIndustryOverview: (entityId: string) => getSupabaseService().getIndustryOverview(entityId),
   saveIndustryOverview: (data: any) => getSupabaseService().saveIndustryOverview(data),
-  getCompetitors: (entityId: string) => getSupabaseService().getCompetitors(entityId),
-  saveCompetitors: (data: any) => getSupabaseService().saveCompetitors(data),
-  getSupplyData: (entityId: string) => getSupabaseService().getSupplyData(entityId),
-  saveSupplyData: (data: any) => getSupabaseService().saveSupplyData(data),
-  getDemandData: (entityId: string) => getSupabaseService().getDemandData(entityId),
-  saveDemandData: (data: any) => getSupabaseService().saveDemandData(data),
-  getRegulations: (entityId: string) => getSupabaseService().getRegulations(entityId),
-  saveRegulations: (data: any) => getSupabaseService().saveRegulations(data)
+  
+  // Competitors methods
+  getIndustryCompetitors: (entityId: string) => getSupabaseService().getIndustryCompetitors(entityId),
+  saveIndustryCompetitors: (entityId: string, competitors: any[]) => getSupabaseService().saveIndustryCompetitors(entityId, competitors),
+  saveIndustryCompetitor: (competitor: any) => getSupabaseService().saveIndustryCompetitor(competitor),
+  
+  // Supply Chain methods
+  getIndustrySupplyChain: (entityId: string) => getSupabaseService().getIndustrySupplyChain(entityId),
+  saveIndustrySupplyChain: (data: any) => getSupabaseService().saveIndustrySupplyChain(data),
+  
+  // End Markets methods
+  getIndustryEndMarkets: (entityId: string) => getSupabaseService().getIndustryEndMarkets(entityId),
+  saveIndustryEndMarkets: (data: any) => getSupabaseService().saveIndustryEndMarkets(data),
+  
+  // Regulations methods
+  getIndustryRegulations: (entityId: string) => getSupabaseService().getIndustryRegulations(entityId),
+  saveIndustryRegulations: (data: any) => getSupabaseService().saveIndustryRegulations(data),
+  
+  // Entity methods
+  getEntityDetails: (entityId: string) => getSupabaseService().getEntityDetails(entityId)
 };
