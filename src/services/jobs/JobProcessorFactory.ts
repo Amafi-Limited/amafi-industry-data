@@ -80,10 +80,17 @@ class IndustryProcessor implements JobProcessor {
     "value_chain": "description of industry value chain",
     "key_success_factors": ["factor 1", "factor 2", "factor 3"],
     "industry_dynamics": "description of key industry dynamics and forces"
-  }
+  },
+  "geographic_distribution": [
+    {"region": "North America", "market_share": <decimal e.g., 0.35 for 35%>, "market_value": <value in millions USD>},
+    {"region": "Europe", "market_share": <decimal>, "market_value": <value in millions USD>},
+    {"region": "Asia Pacific", "market_share": <decimal>, "market_value": <value in millions USD>},
+    {"region": "Latin America", "market_share": <decimal>, "market_value": <value in millions USD>},
+    {"region": "Middle East & Africa", "market_share": <decimal>, "market_value": <value in millions USD>}
+  ]
 }
 
-Provide real, accurate data based on current market research. Use actual numbers, not placeholders.`;
+Provide real, accurate data based on current market research. Use actual numbers, not placeholders. The market_share values in geographic_distribution should sum to 1.0 (100%).`;
 
       progressCallback?.(30, 'Fetching industry data from Perplexity...');
       
@@ -98,7 +105,7 @@ Provide real, accurate data based on current market research. Use actual numbers
         'market_maturity', 'competitive_intensity', 'barriers_to_entry', 'avg_gross_margin',
         'avg_ebitda_margin', 'regulatory_risk', 'technology_risk', 'competitive_risk',
         'key_opportunities', 'key_challenges', 'market_sizing_data', 'industry_lifecycle_stage',
-        'market_overview'
+        'market_overview', 'geographic_distribution'
       ];
       
       const parsedData = perplexityClient.parseResponseWithTruncationHandling(searchResult, expectedFields);
@@ -134,6 +141,7 @@ Provide real, accurate data based on current market research. Use actual numbers
         market_sizing_data: parsedData.market_sizing_data || null,
         industry_lifecycle_stage: parsedData.industry_lifecycle_stage || null,
         market_overview: parsedData.market_overview || null,
+        geographic_distribution: parsedData.geographic_distribution || null,
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -167,8 +175,8 @@ class CompetitorsProcessor implements JobProcessor {
       
       progressCallback?.(20, 'Researching competitive landscape...');
       
-      // Create Perplexity prompt for competitors analysis
-      const prompt = `Identify and analyze the top 10 competitors for ${companyContext}. Return ONLY a JSON object with an array of competitors:
+      // Create Perplexity prompt for strategic competitor analysis
+      const prompt = `Identify and analyze the top 10 competitors for ${companyContext}, focusing on strategic positioning and operational characteristics (NOT financial metrics). Return ONLY a JSON object with an array of competitors:
 
 {
   "competitors": [
@@ -178,18 +186,23 @@ class CompetitorsProcessor implements JobProcessor {
       "competitive_position": "leader" or "challenger" or "follower" or "niche",
       "key_differentiators": "brief description of their main differentiators and competitive advantages",
       "market_share": <decimal percentage, e.g., 0.15 for 15%>,
-      "revenue_usd_m": <annual revenue in millions USD>,
-      "revenue_growth_pct": <year-over-year growth as decimal, e.g., 0.08 for 8%>,
-      "ebitda_margin_pct": <EBITDA margin as decimal, e.g., 0.20 for 20%>,
       "headquarters_country": "country name",
       "employees_count": <number of employees>,
-      "business_model": "brief description of their business model",
-      "threat_level": "low" or "medium" or "high" or "critical"
+      "business_model": "Platform/Marketplace" or "Direct Sales" or "Subscription/SaaS" or "Franchise" or "Asset-Light" or "Vertically Integrated" or "Partnership-Based" or "Hybrid Model",
+      "threat_level": "low" or "medium" or "high" or "critical",
+      "strategic_focus": "primary strategic focus area (e.g., Innovation, Scale, Premium Quality, Cost Leadership)",
+      "competitive_advantages": ["advantage 1", "advantage 2", "advantage 3"],
+      "competitive_weaknesses": ["weakness 1", "weakness 2"],
+      "market_overlap_pct": <decimal percentage of shared target market, e.g., 0.80 for 80%>,
+      "geographic_presence": ["region 1", "region 2", "region 3"],
+      "strategic_initiatives": ["recent strategic move 1", "recent strategic move 2"],
+      "innovation_focus": "primary technology or innovation area focus",
+      "customer_segments": ["target segment 1", "target segment 2"]
     }
   ]
 }
 
-Include a mix of direct competitors, indirect competitors, and potential substitutes. Order by market share or relevance. Provide real, accurate data based on current market information.`;
+Focus on strategic and operational analysis rather than financial performance. Include competitive positioning, strategic initiatives, geographic coverage, innovation focus, and market positioning. Provide real, accurate strategic data based on current market intelligence.`;
 
       progressCallback?.(30, 'Fetching competitor data from Perplexity...');
       
@@ -217,13 +230,19 @@ Include a mix of direct competitors, indirect competitors, and potential substit
         competitive_position: competitor.competitive_position || null,
         key_differentiators: competitor.key_differentiators || null,
         market_share: competitor.market_share || null,
-        revenue_usd_m: competitor.revenue_usd_m || null,
-        revenue_growth_pct: competitor.revenue_growth_pct || null,
-        ebitda_margin_pct: competitor.ebitda_margin_pct || null,
         headquarters_country: competitor.headquarters_country || null,
         employees_count: competitor.employees_count || null,
         business_model: competitor.business_model || null,
         threat_level: competitor.threat_level || null,
+        // New strategic fields
+        strategic_focus: competitor.strategic_focus || null,
+        competitive_advantages: competitor.competitive_advantages || null,
+        competitive_weaknesses: competitor.competitive_weaknesses || null,
+        market_overlap_pct: competitor.market_overlap_pct || null,
+        geographic_presence: competitor.geographic_presence || null,
+        strategic_initiatives: competitor.strategic_initiatives || null,
+        innovation_focus: competitor.innovation_focus || null,
+        customer_segments: competitor.customer_segments || null,
         display_order: index + 1,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -263,8 +282,26 @@ class SupplyChainProcessor implements JobProcessor {
       
       progressCallback?.(20, 'Researching supply chain dynamics...');
       
-      // Create Perplexity prompt for supply chain analysis
-      const prompt = `Analyze the supply chain for the ${industryContext}. Return ONLY a JSON object with comprehensive supply chain data:
+      // Create Perplexity prompt for actual supply chain flow analysis
+      const prompt = `Analyze the ACTUAL SUPPLY CHAIN FLOW for ${request.companyName || 'companies'} in the ${industryContext}. 
+      
+IMPORTANT: Map the REAL physical/service flow from origin to customer. For example:
+- E-commerce: Manufacturers → Ocean/Air Freight → Ports → Distribution Centers → Fulfillment Centers → Last Mile Delivery → Customers
+- Manufacturing: Raw Material Suppliers → Component Suppliers → Assembly Plants → Distribution → Retailers → End Users
+- Software: Development → Testing → Deployment Infrastructure → CDNs → End Users
+- Energy: Extraction → Processing → Transportation (pipelines/ships) → Storage → Distribution → End Users
+
+Focus on the ACTUAL STEPS products/services take to reach customers.
+
+CRITICAL FOR CAPACITY DATA:
+- Manufacturing: Use "thousand units/month", "tons/day", "million units/year" 
+- E-commerce/Retail: Use "million packages/day", "orders/hour", "SKUs handled/month"
+- Energy: Use "MW/hour", "barrels/day", "million cubic feet/day"
+- Logistics: Use "TEUs/month" (shipping), "tons/day" (freight), "packages/hour" (last mile)
+- Technology: Use "transactions/second", "TB/day", "requests/minute"
+Always specify the TIME PERIOD - never just "1200 units" but "1200 units/day"
+
+Return ONLY a JSON object with comprehensive supply chain and value chain intelligence:
 
 {
   "supply_chain_overview": {
@@ -303,34 +340,198 @@ class SupplyChainProcessor implements JobProcessor {
   ],
   "capacity_data": [
     {
-      "category": "Manufacturing" or "Logistics" or "Warehousing" or "Processing" or "Assembly",
-      "capacity": <number representing total capacity in millions of units or appropriate metric>,
-      "utilization": <number representing utilization percentage as decimal, e.g., 0.75 for 75%>,
-      "unit": "units" or "tons" or "square feet" or appropriate unit of measure
+      "category": "Be specific to the industry (e.g., for Amazon: 'Fulfillment Centers', 'Delivery Stations', 'Sort Centers')",
+      "capacity": <number representing actual throughput or capacity>,
+      "utilization": <decimal, e.g., 0.75 for 75%>,
+      "unit": "CRITICAL - Must include time period and be specific! Examples: 'million packages/day', 'tons/hour', 'MW/hour', 'barrels/day', 'vehicles/year', 'TEUs/month', 'million units/quarter', 'thousand transactions/second'. NEVER use just 'units' or 'facilities' without context"
     }
   ],
   "geography_data": [
     {
-      "region": "North America" or "Europe" or "Asia Pacific" or "Latin America" or "Middle East & Africa",
-      "supply_percentage": <decimal percentage of total supply, e.g., 0.35 for 35%>,
+      "region": "North America" or "Europe" or "Asia Pacific" or other,
+      "supply_percentage": <decimal>,
       "capacity_value": <number representing regional capacity>,
-      "utilization_rate": <decimal percentage, e.g., 0.80 for 80%>,
-      "capacity_type": "manufacturing" or "distribution" or "service" or "hybrid"
+      "utilization_rate": <decimal>,
+      "capacity_type": "manufacturing" or "distribution" or "service"
     }
   ],
   "supply_metrics": [
     {
-      "metric": "metric name/description",
-      "current_value": <number or string value>,
-      "target_value": <number or string value>,
+      "metric": "Specific KPI name",
+      "current_value": <value>,
+      "target_value": <value>,
       "trend": "improving" or "stable" or "declining",
       "category": "efficiency" or "cost" or "risk" or "quality" or "sustainability",
-      "unit": "%" or "days" or "units" or appropriate unit
+      "unit": "appropriate unit"
     }
   ]
 }
 
-Provide real, accurate analysis based on current industry supply chain patterns and trends. Include at least 3-5 capacity categories, 3-5 geographic regions, and 8-12 supply chain metrics with realistic data.`;
+  "supply_chain_model": {
+    "model_type": "e-commerce fulfillment" or "manufacturing hub-and-spoke" or "just-in-time production" or "global sourcing network" or "vertically integrated" or "outsourced network" or "hybrid model",
+    "description": "Specific description of how THIS industry's supply chain works (e.g., for Amazon: 'Multi-tier fulfillment network with 175+ fulfillment centers globally')",
+    "core_components": ["component 1", "component 2", "component 3"],
+    "value_chain_position": "upstream supplier" or "midstream processor" or "downstream distributor" or "integrated player",
+    "key_assets": ["asset type 1", "asset type 2"],
+    "technology_enablers": ["technology 1", "technology 2"]
+  },
+  "operational_excellence": {
+    "efficiency_metrics": {
+      "inventory_turnover": <number, e.g., 12.5>,
+      "cash_conversion_cycle": <days, e.g., -30>,
+      "order_fulfillment_time": <hours or days>,
+      "perfect_order_rate": <percentage as decimal, e.g., 0.95>,
+      "on_time_delivery": <percentage as decimal>
+    },
+    "cost_position": {
+      "cost_per_unit": "20% below industry average" or similar comparison,
+      "logistics_cost_percentage": <percentage of revenue as decimal>,
+      "inventory_carrying_cost": <percentage as decimal>,
+      "competitive_position": "cost leader" or "average" or "premium"
+    },
+    "quality_metrics": {
+      "defect_rate": <percentage as decimal>,
+      "return_rate": <percentage as decimal>,
+      "supplier_quality_score": <1-10 scale>
+    },
+    "technology_adoption": {
+      "automation_level": "manual" or "partial" or "advanced" or "fully automated",
+      "digital_maturity": "low" or "medium" or "high" or "leading edge",
+      "key_technologies": ["tech 1", "tech 2", "tech 3"]
+    }
+  },
+  "strategic_advantages": [
+    {
+      "advantage": "Specific competitive advantage (e.g., 'Same-day delivery capability in 50+ metro areas')",
+      "impact": "How this creates value or barriers to entry",
+      "sustainability": "low" or "medium" or "high",
+      "estimated_value": "quantified impact if possible"
+    }
+  ],
+  "dependency_analysis": {
+    "critical_dependencies": [
+      {
+        "dependency_type": "Single-source supplier for X" or "Reliance on Y technology" or similar,
+        "risk_level": "low" or "medium" or "high" or "critical",
+        "alternatives_available": "none" or "limited" or "multiple",
+        "switching_cost": "low" or "medium" or "high",
+        "mitigation_plan": "description of risk mitigation"
+      }
+    ],
+    "supplier_concentration": {
+      "top_3_suppliers_share": <decimal percentage>,
+      "single_source_components": ["component 1", "component 2"],
+      "geographic_concentration": "description of geographic risks"
+    }
+  },
+  "scalability_assessment": {
+    "current_capacity_utilization": <percentage as decimal>,
+    "growth_headroom": "Can support X% growth without major investment",
+    "bottlenecks": ["bottleneck 1", "bottleneck 2"],
+    "investment_requirements": {
+      "next_expansion": "$X million for Y% capacity increase",
+      "timeline": "months or years needed",
+      "roi_expectation": "expected return"
+    },
+    "flexibility_score": <1-10 scale>
+  },
+  "transformation_opportunities": [
+    {
+      "opportunity": "Specific improvement opportunity (e.g., 'Implement autonomous last-mile delivery')",
+      "potential_impact": "Cost reduction of X% or efficiency gain of Y%",
+      "investment_required": "$X million",
+      "implementation_complexity": "low" or "medium" or "high",
+      "timeline": "X months/years"
+    }
+  ],
+  "value_chain_structure": {
+    "total_tiers": <number of tiers from raw materials to end customer>,
+    "tiers_description": "Overview of the complete value chain",
+    "value_flow": "Description of how value flows through the chain",
+    "integration_opportunities": ["opportunity 1", "opportunity 2"]
+  },
+  "supply_chain_tiers": [
+    {
+      "tier_name": "Manufacturing" or "Ocean Freight" or "Distribution Centers" or "Fulfillment Centers" or "Last Mile Delivery" etc,
+      "tier_position": <1 for origin, higher for downstream>,
+      "description": "Specific function in moving products/services to customers",
+      "key_players": ["Amazon Fulfillment (175 centers)", "FedEx", "UPS", "DHL", etc with specifics],
+      "geographic_concentration": "e.g., 70% in China manufacturing, 30% in Vietnam",
+      "capacity_metrics": "1M packages/day" or "50K TEUs/month" or relevant metric,
+      "estimated_margin": "X-Y% EBITDA margin",
+      "lead_time": "X days/hours",
+      "bottlenecks": ["Port congestion", "Driver shortage", etc]
+    }
+  ],
+  "geographic_control_map": [
+    {
+      "region": "Asia-Pacific" or "North America" or "Europe" etc,
+      "supply_chain_elements": ["Raw material sourcing", "Manufacturing", "Assembly"],
+      "dominant_countries": ["China (60%)", "Vietnam (20%)", "Thailand (10%)"],
+      "control_entities": ["Foxconn", "TSMC", "Samsung"],
+      "risk_factors": ["Geopolitical tensions", "Labor costs rising"],
+      "strategic_importance": "Critical" or "High" or "Medium" or "Low"
+    }
+  ],
+  "bottleneck_analysis": {
+    "critical_bottlenecks": [
+      {
+        "bottleneck_type": "Semiconductor shortage" or "Port capacity" or "Skilled labor" etc,
+        "location_in_chain": "Tier 2 suppliers" or specific tier,
+        "impact_severity": "Critical" or "High" or "Medium",
+        "affected_volume": "X% of production",
+        "mitigation_cost": "$X million",
+        "resolution_timeline": "X months",
+        "alternative_solutions": ["Solution 1", "Solution 2"]
+      }
+    ],
+    "constraint_analysis": {
+      "primary_constraint": "Description of main limiting factor",
+      "capacity_ceiling": "Maximum throughput possible",
+      "expansion_requirements": "What's needed to break through constraint"
+    }
+  },
+  "profit_pools": {
+    "total_industry_profit": "$X billion",
+    "profit_distribution": [
+      {
+        "tier": "Raw Materials",
+        "profit_share": <percentage as decimal>,
+        "margin_range": "X-Y%",
+        "trend": "increasing" or "stable" or "declining"
+      }
+    ],
+    "value_creation_opportunities": ["Opportunity to capture X% more margin by...", "Vertical integration could add $Y million"],
+    "margin_pressure_points": ["Where margins are being squeezed and why"]
+  },
+  "market_concentration": {
+    "herfindahl_index": <HHI score if available>,
+    "concentration_by_tier": [
+      {
+        "tier": "tier name",
+        "top_3_share": <decimal percentage>,
+        "top_5_share": <decimal percentage>,
+        "fragmentation_level": "Highly concentrated" or "Moderately concentrated" or "Fragmented"
+      }
+    ],
+    "control_points": ["Who controls critical chokepoints", "Key gatekeepers"],
+    "switching_barriers": "Description of barriers to changing suppliers/partners"
+  },
+  "power_dynamics": {
+    "power_distribution": "Description of who has leverage in the value chain",
+    "bargaining_power_map": [
+      {
+        "relationship": "Suppliers to Manufacturers",
+        "power_balance": "Suppliers dominant" or "Balanced" or "Manufacturers dominant",
+        "key_factors": ["Factor 1", "Factor 2"]
+      }
+    ],
+    "value_capture_ability": "Who can capture the most value and why",
+    "disruption_potential": "Where new entrants could disrupt power dynamics"
+  }
+}
+
+Provide REAL, SPECIFIC data for ${request.companyName || 'the company'} where available, or realistic industry benchmarks. Focus on actionable intelligence for M&A decisions.`;
 
       progressCallback?.(30, 'Fetching supply chain data from Perplexity...');
       
@@ -339,7 +540,14 @@ Provide real, accurate analysis based on current industry supply chain patterns 
       progressCallback?.(50, 'Processing supply chain intelligence...');
       
       // Parse response with truncation handling
-      const expectedFields = ['supply_chain_overview', 'supply_chain_risks', 'key_suppliers', 'distribution_channels', 'capacity_data', 'geography_data', 'supply_metrics'];
+      const expectedFields = [
+        'supply_chain_model', 'operational_excellence', 'strategic_advantages', 
+        'dependency_analysis', 'scalability_assessment', 'transformation_opportunities', 
+        'supply_chain_overview', 'supply_chain_risks', 'key_suppliers', 
+        'distribution_channels', 'capacity_data', 'geography_data', 'supply_metrics',
+        'value_chain_structure', 'supply_chain_tiers', 'geographic_control_map',
+        'bottleneck_analysis', 'profit_pools', 'market_concentration', 'power_dynamics'
+      ];
       const parsedData = perplexityClient.parseResponseWithTruncationHandling(searchResult, expectedFields);
       
       if (!parsedData) {
@@ -359,6 +567,20 @@ Provide real, accurate analysis based on current industry supply chain patterns 
         capacity_data: parsedData.capacity_data || null,
         geography_data: parsedData.geography_data || null,
         supply_metrics: parsedData.supply_metrics || null,
+        supply_chain_model: parsedData.supply_chain_model || null,
+        operational_excellence: parsedData.operational_excellence || null,
+        strategic_advantages: parsedData.strategic_advantages || null,
+        dependency_analysis: parsedData.dependency_analysis || null,
+        scalability_assessment: parsedData.scalability_assessment || null,
+        transformation_opportunities: parsedData.transformation_opportunities || null,
+        // New value chain analysis fields
+        value_chain_structure: parsedData.value_chain_structure || null,
+        supply_chain_tiers: parsedData.supply_chain_tiers || null,
+        geographic_control_map: parsedData.geographic_control_map || null,
+        bottleneck_analysis: parsedData.bottleneck_analysis || null,
+        profit_pools: parsedData.profit_pools || null,
+        market_concentration: parsedData.market_concentration || null,
+        power_dynamics: parsedData.power_dynamics || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -388,22 +610,22 @@ class EndMarketsProcessor implements JobProcessor {
     try {
       progressCallback?.(10, 'Starting end markets analysis...');
       
-      const industryContext = `${request.primaryIndustry || request.companyDescription} industry`;
+      const companyContext = `${request.companyName} operating in the ${request.primaryIndustry || request.companyDescription} industry`;
       
-      progressCallback?.(20, 'Researching market segments and TAM...');
+      progressCallback?.(20, 'Researching addressable market segments...');
       
       // Create Perplexity prompt for end markets analysis
-      const prompt = `Analyze the end markets and customer segments for the ${industryContext}. Return ONLY a JSON object with comprehensive market data:
+      const prompt = `Analyze the ADDRESSABLE market opportunity specifically for ${companyContext}. This should be SMALLER than the total industry size, representing only the segments this company can realistically serve. Return ONLY a JSON object with comprehensive market data:
 
 {
   "tam_data": [
-    {"year": 2023, "tam_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2024, "tam_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2025, "tam_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2026, "tam_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2027, "tam_size_usd_m": <number>, "growth_rate": <decimal>}
+    {"year": 2023, "tam_size_usd_m": <addressable market in millions, NOT total industry>, "growth_rate": <decimal>},
+    {"year": 2024, "tam_size_usd_m": <addressable market in millions, NOT total industry>, "growth_rate": <decimal>},
+    {"year": 2025, "tam_size_usd_m": <addressable market in millions, NOT total industry>, "growth_rate": <decimal>},
+    {"year": 2026, "tam_size_usd_m": <addressable market in millions, NOT total industry>, "growth_rate": <decimal>},
+    {"year": 2027, "tam_size_usd_m": <addressable market in millions, NOT total industry>, "growth_rate": <decimal>}
   ],
-  "tam_size": <current TAM in millions USD>,
+  "tam_size": <current addressable TAM in millions USD, must be less than total industry size>,
   "growth_rate": <annual growth rate as decimal>,
   "segment_data": [
     {
@@ -449,7 +671,7 @@ class EndMarketsProcessor implements JobProcessor {
   ]
 }
 
-Provide real, accurate market data based on current industry research and analysis.`;
+IMPORTANT: TAM (Total Addressable Market) represents the realistic revenue opportunity available to this specific company, NOT the entire industry size. For example, if the global e-commerce market is $6 trillion, Amazon's TAM might only be $2-3 trillion based on the segments they serve. Provide real, accurate market data based on current industry research and analysis.`;
 
       progressCallback?.(30, 'Fetching market data from Perplexity...');
       
@@ -530,7 +752,7 @@ Provide real, accurate market data based on current industry research and analys
 
 /**
  * Regulations Processor
- * Analyzes regulatory environment and compliance requirements
+ * Analyzes regulatory environment and M&A-specific regulatory impacts
  */
 class RegulationsProcessor implements JobProcessor {
   async process(request: ProcessorRequest, progressCallback?: JobProgressCallback): Promise<any> {
@@ -538,100 +760,51 @@ class RegulationsProcessor implements JobProcessor {
       progressCallback?.(10, 'Starting regulatory analysis...');
       
       const industryContext = `${request.primaryIndustry || request.companyDescription} industry`;
+      const companyName = request.companyName || 'this company';
       
       progressCallback?.(20, 'Researching regulatory landscape...');
       
-      // Create Perplexity prompt for regulatory analysis
-      const prompt = `Analyze the regulatory environment for the ${industryContext}. Return ONLY a JSON object with comprehensive regulatory data:
+      // Create Perplexity prompt for dual-table regulatory analysis
+      const prompt = `Analyze the regulatory environment for the ${industryContext} and ${companyName}. Return ONLY a JSON object with TWO sections - general industry regulations and M&A-specific regulatory impacts:
 
 {
-  "regulatory_bodies": [
-    "regulatory body 1",
-    "regulatory body 2",
-    "regulatory body 3"
-  ],
-  "key_regulations": [
+  "industry_regulations": [
     {
-      "regulation_name": "regulation or law name",
-      "jurisdiction": "global" or "US" or "EU" or "specific country",
-      "description": "brief description of the regulation",
-      "compliance_deadline": "date or 'ongoing'",
-      "penalties": "description of non-compliance penalties",
-      "impact_level": "low" or "medium" or "high" or "critical"
+      "regulation_name": "specific regulation name (e.g., GDPR, SOX, HIPAA)",
+      "description": "clear description of what this regulation covers and requires",
+      "regulatory_body": "the regulatory authority enforcing this (e.g., SEC, FDA, FTC)",
+      "country": "jurisdiction (e.g., US, EU, UK, China, Global)",
+      "operational_impact": "Low" or "Medium" or "High",
+      "key_requirements": "specific compliance requirements and operational changes needed"
     }
   ],
-  "compliance_requirements": [
-    "specific compliance requirement 1",
-    "specific compliance requirement 2",
-    "specific compliance requirement 3",
-    "specific compliance requirement 4",
-    "specific compliance requirement 5"
-  ],
-  "regulatory_burden": "low" or "medium" or "high",
-  "compliance_cost_impact": "low" or "medium" or "high" or "very_high",
-  "enforcement_strictness": "lenient" or "moderate" or "strict" or "very_strict",
-  "penalty_severity": "minor" or "moderate" or "severe" or "business_threatening",
-  "initial_compliance_cost_usd": <number for one-time setup costs>,
-  "ongoing_compliance_cost_usd": <number for annual compliance costs>,
-  "compliance_staff_fte": <number of full-time staff needed for compliance>,
-  "barrier_to_entry_effect": "raises" or "neutral" or "lowers",
-  "innovation_impact": "inhibits" or "neutral" or "encourages",
-  "regulatory_moat_potential": "low" or "medium" or "high",
-  "political_risk_level": "low" or "medium" or "high",
-  "harmonization_status": "harmonized" or "partially_harmonized" or "fragmented",
-  "regional_differences": [
+  "ma_regulatory_impacts": [
     {
-      "region": "region or country",
-      "key_requirements": ["requirement 1", "requirement 2"],
-      "regulatory_intensity": "low" or "medium" or "high",
-      "unique_challenges": ["challenge 1", "challenge 2"]
+      "regulation_name": "specific regulation affecting M&A (e.g., Hart-Scott-Rodino Act, EU Merger Regulation)",
+      "description": "what this regulation means for M&A transactions",
+      "regulatory_body": "authority that reviews/approves deals (e.g., FTC/DOJ, European Commission)",
+      "country": "jurisdiction where this applies",
+      "ma_implications": "specific impact on M&A deals (thresholds, filing requirements, approval needed)",
+      "deal_impact": "Low" or "Medium" or "High",
+      "typical_timeline": "expected review/approval timeline (e.g., 30 days, 3-6 months)",
+      "mitigation_strategy": "how to navigate this regulation in M&A context"
     }
-  ],
-  "upcoming_changes": [
-    "upcoming regulatory change 1",
-    "upcoming regulatory change 2",
-    "upcoming regulatory change 3"
-  ],
-  "regulatory_overview": {
-    "current_state": "description of current regulatory environment",
-    "trend_direction": "increasing regulation" or "stable" or "deregulation",
-    "key_compliance_areas": ["area 1", "area 2", "area 3"],
-    "regulatory_risks": [
-      {
-        "risk_type": "risk category",
-        "description": "detailed description",
-        "likelihood": "low" or "medium" or "high",
-        "impact": "low" or "medium" or "high" or "critical"
-      }
-    ],
-    "best_practices": ["practice 1", "practice 2", "practice 3"]
-  },
-  "compliance_areas": {
-    "data_privacy": "description of data privacy requirements",
-    "environmental": "description of environmental regulations",
-    "labor": "description of labor law compliance",
-    "financial_reporting": "description of financial reporting requirements",
-    "product_safety": "description of product safety standards"
-  }
+  ]
 }
 
-Provide real, accurate regulatory information based on current laws and regulations affecting the industry.`;
+For industry_regulations, include 8-12 KEY regulations that significantly impact operations in this industry.
+For ma_regulatory_impacts, include 5-8 regulations that specifically affect M&A transactions, mergers, acquisitions, or investment deals in this industry.
+
+Focus on REAL, CURRENT regulations with accurate details. Be specific about regulatory bodies and jurisdictions.`;
 
       progressCallback?.(30, 'Fetching regulatory data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 3000);
+      const searchResult = await perplexityClient.query(prompt, 4000);
       
       progressCallback?.(50, 'Processing regulatory intelligence...');
       
       // Parse response with truncation handling
-      const expectedFields = [
-        'regulatory_bodies', 'key_regulations', 'compliance_requirements', 'regulatory_burden', 
-        'compliance_cost_impact', 'enforcement_strictness', 'penalty_severity',
-        'initial_compliance_cost_usd', 'ongoing_compliance_cost_usd', 'compliance_staff_fte',
-        'barrier_to_entry_effect', 'innovation_impact', 'regulatory_moat_potential',
-        'political_risk_level', 'harmonization_status', 'regional_differences', 
-        'upcoming_changes', 'regulatory_overview', 'compliance_areas'
-      ];
+      const expectedFields = ['industry_regulations', 'ma_regulatory_impacts'];
       const parsedData = perplexityClient.parseResponseWithTruncationHandling(searchResult, expectedFields);
       
       if (!parsedData) {
@@ -640,44 +813,41 @@ Provide real, accurate regulatory information based on current laws and regulati
       
       progressCallback?.(70, 'Structuring regulatory data...');
       
-      // Prepare data for database (matching the actual schema)
+      // Prepare data for industry_regulations table (simplified structure)
       const regulationsData = {
         entity_id: request.entityId,
         profile_id: request.profileId,
-        regulatory_bodies: parsedData.regulatory_bodies || [],
-        key_regulations: parsedData.key_regulations || null,
-        compliance_requirements: parsedData.compliance_requirements || [],
-        regulatory_burden: parsedData.regulatory_burden || null,
-        compliance_costs: parsedData.compliance_costs || null,
-        compliance_cost_impact: parsedData.compliance_cost_impact || null,
-        enforcement_strictness: parsedData.enforcement_strictness || null,
-        penalty_severity: parsedData.penalty_severity || null,
-        initial_compliance_cost_usd: parsedData.initial_compliance_cost_usd || null,
-        ongoing_compliance_cost_usd: parsedData.ongoing_compliance_cost_usd || null,
-        compliance_staff_fte: parsedData.compliance_staff_fte || null,
-        barrier_to_entry_effect: parsedData.barrier_to_entry_effect || null,
-        innovation_impact: parsedData.innovation_impact || null,
-        regulatory_moat_potential: parsedData.regulatory_moat_potential || null,
-        political_risk_level: parsedData.political_risk_level || null,
-        harmonization_status: parsedData.harmonization_status || null,
-        regional_differences: parsedData.regional_differences || null,
-        upcoming_changes: parsedData.upcoming_changes || [],
-        regulatory_overview: parsedData.regulatory_overview || null,
-        compliance_areas: parsedData.compliance_areas || null,
-        confidence_level: 'medium',
+        regulations: parsedData.industry_regulations || [],
+        key_regulations: null, // Keep for backward compatibility but will be deprecated
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        last_updated: new Date().toISOString()
+        updated_at: new Date().toISOString()
+      };
+
+      // Prepare data for industry_ma_regulatory_impacts table
+      const maRegulationsData = {
+        entity_id: request.entityId,
+        profile_id: request.profileId,
+        ma_regulations: parsedData.ma_regulatory_impacts || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       progressCallback?.(85, 'Saving regulatory data...');
+      
+      // Save to industry_regulations table
       await supabaseService.saveIndustryRegulations(regulationsData);
+      
+      // Save to industry_ma_regulatory_impacts table
+      await supabaseService.saveIndustryMARegulations(maRegulationsData);
       
       progressCallback?.(90, 'Finalizing regulatory analysis...');
       
       return {
         success: true,
-        data: regulationsData
+        data: {
+          regulations: regulationsData,
+          maRegulations: maRegulationsData
+        }
       };
     } catch (error) {
       logger.error('Regulations processor error:', error);

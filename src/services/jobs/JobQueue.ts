@@ -59,7 +59,7 @@ class JobQueue {
         const processor = JobProcessorFactory.getProcessor(data.type);
         
         // Create progress callback
-        const progressCallback = (progress: number, message: string) => {
+        const progressCallback = (progress: number, message?: string) => {
           job.progress(progress);
           
           // Send WebSocket update
@@ -69,12 +69,12 @@ class JobQueue {
               type: data.type,
               status: 'processing',
               progress,
-              message,
+              message: message || 'Processing...',
               companyName: data.companyName
             });
           }
           
-          logger.info(`📊 Job ${data.jobId}: ${message} (${progress}%)`);
+          logger.info(`📊 Job ${data.jobId}: ${message || 'Processing'} (${progress}%)`);
         };
 
         // Process the job

@@ -239,6 +239,32 @@ export class SupabaseService {
   }
 
   /**
+   * Save M&A regulatory impacts data
+   */
+  async saveIndustryMARegulations(data: any) {
+    // First delete existing data for this entity
+    const { error: deleteError } = await this.supabase
+      .from('industry_ma_regulatory_impacts')
+      .delete()
+      .eq('entity_id', data.entity_id)
+      .eq('profile_id', data.profile_id);
+    
+    if (deleteError) {
+      logger.error('Error deleting existing M&A regulations data:', deleteError);
+    }
+
+    // Then insert new data
+    const { error } = await this.supabase
+      .from('industry_ma_regulatory_impacts')
+      .insert(data);
+
+    if (error) {
+      logger.error('Error saving M&A regulations:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get entity details from entities_list
    */
   async getEntityDetails(entityId: string) {
@@ -288,6 +314,7 @@ export const supabaseService = {
   // Regulations methods
   getIndustryRegulations: (entityId: string) => getSupabaseService().getIndustryRegulations(entityId),
   saveIndustryRegulations: (data: any) => getSupabaseService().saveIndustryRegulations(data),
+  saveIndustryMARegulations: (data: any) => getSupabaseService().saveIndustryMARegulations(data),
   
   // Entity methods
   getEntityDetails: (entityId: string) => getSupabaseService().getEntityDetails(entityId)
