@@ -265,11 +265,11 @@ export class SupabaseService {
   }
 
   /**
-   * Get entity details from entities_list
+   * Get entity details from master_entities
    */
   async getEntityDetails(entityId: string) {
     const { data, error } = await this.supabase
-      .from('entities_list')
+      .from('master_entities')
       .select('*')
       .eq('id', entityId)
       .single();

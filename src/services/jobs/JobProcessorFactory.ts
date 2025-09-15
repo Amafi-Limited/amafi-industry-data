@@ -68,11 +68,13 @@ class IndustryProcessor implements JobProcessor {
   "key_opportunities": ["opportunity 1", "opportunity 2", "opportunity 3", "opportunity 4"],
   "key_challenges": ["challenge 1", "challenge 2", "challenge 3", "challenge 4"],
   "market_sizing_data": [
-    {"year": 2022, "market_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2023, "market_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2024, "market_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2025, "market_size_usd_m": <number>, "growth_rate": <decimal>},
-    {"year": 2026, "market_size_usd_m": <number>, "growth_rate": <decimal>}
+    {"year": 2021, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": false},
+    {"year": 2022, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": false},
+    {"year": 2023, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": false},
+    {"year": 2024, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": false},
+    {"year": 2025, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": true},
+    {"year": 2026, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": true},
+    {"year": 2027, "market_size_usd_m": <number>, "growth_rate": <decimal>, "is_forecast": true}
   ],
   "industry_lifecycle_stage": "introduction" or "growth" or "maturity" or "decline",
   "market_overview": {
@@ -90,7 +92,13 @@ class IndustryProcessor implements JobProcessor {
   ]
 }
 
-Provide real, accurate data based on current market research. Use actual numbers, not placeholders. The market_share values in geographic_distribution should sum to 1.0 (100%).`;
+Provide real, accurate data based on current market research. Use actual numbers, not placeholders. The market_share values in geographic_distribution should sum to 1.0 (100%).
+
+IMPORTANT for market_sizing_data:
+- Years 2021-2024 should be marked as is_forecast: false (historical/actual data)
+- Years 2025-2027 should be marked as is_forecast: true (projected/forecast data)
+- Include 7 years total of data (2021-2027)
+- Provide actual historical data for past years and reasonable projections for future years`;
 
       progressCallback?.(30, 'Fetching industry data from Perplexity...');
       
