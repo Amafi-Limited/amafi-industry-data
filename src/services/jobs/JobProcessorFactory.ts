@@ -102,7 +102,13 @@ IMPORTANT for market_sizing_data:
 
       progressCallback?.(30, 'Fetching industry data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 3000);
+      const searchResponse = await perplexityClient.query(prompt, 3000);
+      const searchResult = searchResponse.data;
+      const citations = searchResponse.citations || [];
+      
+      if (citations.length > 0) {
+        logger.info(`📚 Found ${citations.length} citations for industry data`);
+      }
       
       progressCallback?.(50, 'Processing industry intelligence...');
       
@@ -150,6 +156,15 @@ IMPORTANT for market_sizing_data:
         industry_lifecycle_stage: parsedData.industry_lifecycle_stage || null,
         market_overview: parsedData.market_overview || null,
         geographic_distribution: parsedData.geographic_distribution || null,
+        // CRITICAL: Store citations in overview_data JSONB column
+        overview_data: citations.length > 0 
+          ? {
+              industry_name: parsedData.industry_name || industryName,
+              market_size: parsedData.market_size_usd_m,
+              growth_rate: parsedData.market_growth_rate,
+              citations: citations
+            }
+          : null,
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -214,7 +229,13 @@ Focus on strategic and operational analysis rather than financial performance. I
 
       progressCallback?.(30, 'Fetching competitor data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 3000);
+      const searchResponse = await perplexityClient.query(prompt, 3000);
+      const searchResult = searchResponse.data;
+      const citations = searchResponse.citations || [];
+      
+      if (citations.length > 0) {
+        logger.info(`📚 Found ${citations.length} citations for competitor data`);
+      }
       
       progressCallback?.(50, 'Processing competitor intelligence...');
       
@@ -251,6 +272,14 @@ Focus on strategic and operational analysis rather than financial performance. I
         strategic_initiatives: competitor.strategic_initiatives || null,
         innovation_focus: competitor.innovation_focus || null,
         customer_segments: competitor.customer_segments || null,
+        // CRITICAL: Store citations in competitor_data JSONB column
+        competitor_data: citations.length > 0 
+          ? {
+              name: competitor.competitor_name,
+              differentiators: competitor.key_differentiators,
+              citations: citations
+            }
+          : null,
         display_order: index + 1,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -543,7 +572,13 @@ Provide REAL, SPECIFIC data for ${request.companyName || 'the company'} where av
 
       progressCallback?.(30, 'Fetching supply chain data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 3000);
+      const searchResponse = await perplexityClient.query(prompt, 3000);
+      const searchResult = searchResponse.data;
+      const citations = searchResponse.citations || [];
+      
+      if (citations.length > 0) {
+        logger.info(`📚 Found ${citations.length} citations for supply chain data`);
+      }
       
       progressCallback?.(50, 'Processing supply chain intelligence...');
       
@@ -589,6 +624,14 @@ Provide REAL, SPECIFIC data for ${request.companyName || 'the company'} where av
         profit_pools: parsedData.profit_pools || null,
         market_concentration: parsedData.market_concentration || null,
         power_dynamics: parsedData.power_dynamics || null,
+        // CRITICAL: Store citations in supplychain_data JSONB column
+        supplychain_data: citations.length > 0 
+          ? {
+              model: parsedData.supply_chain_model,
+              overview: parsedData.supply_chain_overview,
+              citations: citations
+            }
+          : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -683,7 +726,13 @@ IMPORTANT: TAM (Total Addressable Market) represents the realistic revenue oppor
 
       progressCallback?.(30, 'Fetching market data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 3000);
+      const searchResponse = await perplexityClient.query(prompt, 3000);
+      const searchResult = searchResponse.data;
+      const citations = searchResponse.citations || [];
+      
+      if (citations.length > 0) {
+        logger.info(`📚 Found ${citations.length} citations for market data`);
+      }
       
       progressCallback?.(50, 'Processing market intelligence...');
       
@@ -738,6 +787,15 @@ IMPORTANT: TAM (Total Addressable Market) represents the realistic revenue oppor
         market_segments: parsedData.market_segments || null,
         customer_concentration: parsedData.customer_concentration || null,
         geographic_markets: parsedData.geographic_markets || null,
+        // CRITICAL: Store citations in endmarkets_data JSONB column
+        endmarkets_data: citations.length > 0 
+          ? {
+              tam_size: calculatedTamSize,
+              growth_rate: calculatedGrowthRate,
+              segments: parsedData.segment_data,
+              citations: citations
+            }
+          : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -807,7 +865,13 @@ Focus on REAL, CURRENT regulations with accurate details. Be specific about regu
 
       progressCallback?.(30, 'Fetching regulatory data from Perplexity...');
       
-      const searchResult = await perplexityClient.query(prompt, 4000);
+      const searchResponse = await perplexityClient.query(prompt, 4000);
+      const searchResult = searchResponse.data;
+      const citations = searchResponse.citations || [];
+      
+      if (citations.length > 0) {
+        logger.info(`📚 Found ${citations.length} citations for regulatory data`);
+      }
       
       progressCallback?.(50, 'Processing regulatory intelligence...');
       
@@ -827,6 +891,14 @@ Focus on REAL, CURRENT regulations with accurate details. Be specific about regu
         profile_id: request.profileId,
         regulations: parsedData.industry_regulations || [],
         key_regulations: null, // Keep for backward compatibility but will be deprecated
+        // CRITICAL: Store citations in regulation_data JSONB column
+        regulation_data: citations.length > 0 
+          ? {
+              regulations: parsedData.industry_regulations || [],
+              ma_impacts: parsedData.ma_regulatory_impacts || [],
+              citations: citations
+            }
+          : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

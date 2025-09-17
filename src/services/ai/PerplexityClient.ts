@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { Citation, PerplexityResponse } from '../../types/citations';
 
 /**
  * PerplexityClient - Centralized client for all Perplexity API interactions
@@ -19,10 +20,10 @@ export class PerplexityClient {
   /**
    * Generic method to query Perplexity API
    */
-  async query(prompt: string, maxTokens: number = 2000, useDeepResearch: boolean = false): Promise<any> {
+  async query(prompt: string, maxTokens: number = 2000, useDeepResearch: boolean = false): Promise<PerplexityResponse<any>> {
     if (!this.apiKey) {
       logger.warn('Perplexity API key not configured, returning null');
-      return null;
+      return { data: null, citations: [] };
     }
 
     try {
@@ -86,32 +87,108 @@ export class PerplexityClient {
         }
       );
 
-      let content = response.data.choices[0].message.content;
+      // Extract content AND citations from response
+      const content = response.data.choices[0].message.content;
+      
+      // Citations are at the TOP LEVEL of response.data, not in message
+      const rawCitations = response.data.citations || [];
+      const searchResults = response.data.search_results || [];
+      
+      logger.info(`🔍 Raw Perplexity response length: ${content.length} characters`);
+      logger.info(`📚 Found ${rawCitations.length} citations in response.data.citations`);
+      logger.info(`🔍 Found ${searchResults.length} search results`);
+      
+      // Transform Perplexity citations to our Citation format
+      const citations = rawCitations.map((citation: string, index: number) => {
+        // Extract domain from URL for source
+        let source = 'unknown';
+        try {
+          const url = new URL(citation);
+          source = url.hostname;
+        } catch {
+          source = citation;
+        }
+        
+        // Find corresponding search result if available
+        const searchResult = searchResults[index];
+        
+        return {
+          url: citation,
+          title: searchResult?.title || `Source ${index + 1}`,
+          snippet: searchResult?.snippet || '',
+          source: source,
+          confidence: this.calculateSourceConfidence(source),
+          index: index + 1  // Citation numbers in content use 1-based indexing [1], [2], etc
+        };
+      });
+      
+      if (citations.length > 0) {
+        logger.info(`✅ Successfully extracted ${citations.length} citations from Perplexity response`);
+      }
+      
+      // Parse the content
+      let parsedData = content;
       
       // Try to parse JSON if the response looks like JSON
       if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
         try {
           // First, fix number formatting issues (remove underscores from numbers)
-          // This handles cases like 55_750 -> 55750
           const fixedContent = content.replace(/(\d)_(\d)/g, '$1$2');
-          return JSON.parse(fixedContent);
+          parsedData = JSON.parse(fixedContent);
         } catch (e) {
           // If JSON parsing fails, try to extract JSON from markdown
           const jsonMatch = content.match(/```json?\n?([\s\S]*?)\n?```/);
           if (jsonMatch) {
             const fixedContent = jsonMatch[1].replace(/(\d)_(\d)/g, '$1$2');
-            return JSON.parse(fixedContent);
+            parsedData = JSON.parse(fixedContent);
           }
           // Return raw content if not JSON
-          return content;
         }
       }
       
-      return content;
+      // Return both data and citations
+      return {
+        data: parsedData,
+        citations: citations
+      };
     } catch (error: any) {
       logger.error('Perplexity API error:', error.response?.data || error.message);
       throw error;
     }
+  }
+
+  /**
+   * Calculate confidence score based on the source domain
+   */
+  private calculateSourceConfidence(source: string): number {
+    const trustScores: Record<string, number> = {
+      'sec.gov': 1.00,
+      'edgar.sec.gov': 1.00,
+      'bloomberg.com': 0.95,
+      'reuters.com': 0.95,
+      'wsj.com': 0.90,
+      'ft.com': 0.90,
+      'forbes.com': 0.85,
+      'businessinsider.com': 0.80,
+      'crunchbase.com': 0.85,
+      'pitchbook.com': 0.85,
+      'seekingalpha.com': 0.80,
+      'marketwatch.com': 0.80,
+      'yahoo.com': 0.75,
+      'cnbc.com': 0.80,
+      'fool.com': 0.75,
+      'linkedin.com': 0.75,
+      'wikipedia.org': 0.70,
+      'twitter.com': 0.60,
+      'reddit.com': 0.50,
+      'facebook.com': 0.50
+    };
+    
+    const domain = (source || '').toLowerCase();
+    for (const [key, score] of Object.entries(trustScores)) {
+      if (domain.includes(key)) return score;
+    }
+    return 0.50; // Default confidence for unknown sources
   }
 
   /**
