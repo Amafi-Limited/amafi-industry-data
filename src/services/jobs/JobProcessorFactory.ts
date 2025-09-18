@@ -41,12 +41,22 @@ class IndustryProcessor implements JobProcessor {
     try {
       progressCallback?.(10, 'Starting industry analysis...');
       
-      const industryName = request.primaryIndustry || request.companyDescription || 'Technology';
+      // Don't use the industry field - focus on the actual company
+      logger.info(`🎯 Industry analysis for company: ${request.companyName}, Primary Industry field (IGNORED): ${request.primaryIndustry}`);
       
       progressCallback?.(20, 'Querying market intelligence...');
       
       // Create Perplexity prompt for industry overview
-      const prompt = `Analyze the ${industryName} industry and provide comprehensive market intelligence. Return ONLY a JSON object with the following structure:
+      const prompt = `Research ${request.companyName} SPECIFICALLY and analyze THEIR actual business and markets. 
+
+IGNORE ANY GENERIC INDUSTRY CLASSIFICATIONS. Instead:
+1. First, research what ${request.companyName} actually does as a business
+2. Then analyze the markets that are relevant to ${request.companyName}'s actual operations
+3. For example, if ${request.companyName} is ANZ (a bank), analyze banking/financial services markets, NOT IT or technology markets
+
+DO NOT use generic industry categories. Focus ONLY on what ${request.companyName} actually does as their core business.
+
+Return ONLY a JSON object with the following structure:
 
 {
   "industry_name": "exact industry name",
@@ -84,7 +94,7 @@ class IndustryProcessor implements JobProcessor {
     "industry_dynamics": "description of key industry dynamics and forces"
   },
   "geographic_distribution": [
-    {"region": "North America", "market_share": <decimal e.g., 0.35 for 35%>, "market_value": <value in millions USD>},
+    {"region": "North America", "market_share": <decimal representing this region's share of the TOTAL MARKET above, e.g., 0.35 for 35%>, "market_value": <this region's market value in millions USD>},
     {"region": "Europe", "market_share": <decimal>, "market_value": <value in millions USD>},
     {"region": "Asia Pacific", "market_share": <decimal>, "market_value": <value in millions USD>},
     {"region": "Latin America", "market_share": <decimal>, "market_value": <value in millions USD>},
@@ -92,7 +102,13 @@ class IndustryProcessor implements JobProcessor {
   ]
 }
 
-Provide real, accurate data based on current market research. Use actual numbers, not placeholders. The market_share values in geographic_distribution should sum to 1.0 (100%).
+CRITICAL for geographic_distribution:
+- This should show how the TOTAL MARKET (market_size_usd_m above) is distributed across regions
+- For example, if the total market is $1000M and North America is $350M, then North America's market_share is 0.35
+- The market_share values MUST sum to 1.0 (100%)
+- This is about the market's geographic split, NOT about where ${request.companyName} operates
+
+Provide real, accurate data based on current market research. Use actual numbers, not placeholders.
 
 IMPORTANT for market_sizing_data:
 - Years 2021-2024 should be marked as is_forecast: false (historical/actual data)
@@ -130,11 +146,28 @@ IMPORTANT for market_sizing_data:
       
       progressCallback?.(70, 'Structuring industry data...');
       
+      // Validate geographic distribution if present
+      if (parsedData.geographic_distribution && Array.isArray(parsedData.geographic_distribution)) {
+        const totalShare = parsedData.geographic_distribution.reduce((sum: number, region: any) => {
+          return sum + (region.market_share || 0);
+        }, 0);
+        
+        // If total is way off (like 89% for one region), normalize it
+        if (totalShare < 0.95 || totalShare > 1.05) {
+          logger.warn(`⚠️ Geographic distribution shares sum to ${totalShare}, normalizing to 100%`);
+          parsedData.geographic_distribution.forEach((region: any) => {
+            if (totalShare > 0) {
+              region.market_share = region.market_share / totalShare;
+            }
+          });
+        }
+      }
+      
       // Prepare data for database
       const industryData = {
         entity_id: request.entityId,
         profile_id: request.profileId,
-        industry_name: parsedData.industry_name || industryName,
+        industry_name: parsedData.industry_name || `${request.companyName} Market`,
         industry_description: parsedData.industry_description || null,
         market_size_usd_m: parsedData.market_size_usd_m || null,
         market_growth_rate: parsedData.market_growth_rate || null,
@@ -159,7 +192,7 @@ IMPORTANT for market_sizing_data:
         // CRITICAL: Store citations in overview_data JSONB column
         overview_data: citations.length > 0 
           ? {
-              industry_name: parsedData.industry_name || industryName,
+              industry_name: parsedData.industry_name || `${request.companyName} Market`,
               market_size: parsedData.market_size_usd_m,
               growth_rate: parsedData.market_growth_rate,
               citations: citations
@@ -319,24 +352,28 @@ class SupplyChainProcessor implements JobProcessor {
       
       progressCallback?.(20, 'Researching supply chain dynamics...');
       
-      // Create Perplexity prompt for actual supply chain flow analysis
-      const prompt = `Analyze the ACTUAL SUPPLY CHAIN FLOW for ${request.companyName || 'companies'} in the ${industryContext}. 
+      // Create Perplexity prompt for actual business operations and value chain
+      const prompt = `Analyze the ACTUAL BUSINESS OPERATIONS and value chain specifically for ${request.companyName}. 
       
-IMPORTANT: Map the REAL physical/service flow from origin to customer. For example:
-- E-commerce: Manufacturers → Ocean/Air Freight → Ports → Distribution Centers → Fulfillment Centers → Last Mile Delivery → Customers
-- Manufacturing: Raw Material Suppliers → Component Suppliers → Assembly Plants → Distribution → Retailers → End Users
-- Software: Development → Testing → Deployment Infrastructure → CDNs → End Users
-- Energy: Extraction → Processing → Transportation (pipelines/ships) → Storage → Distribution → End Users
+CRITICAL: Research how ${request.companyName} ACTUALLY operates their business. This means:
+- For banks: funding sources (deposits, wholesale funding, capital markets) → lending operations (mortgages, commercial loans, credit cards) → risk management → profit generation
+- For manufacturers: raw materials → production → distribution → customers
+- For tech companies: development → deployment → user acquisition → monetization
+- For service companies: talent/resources → service delivery → client relationships
 
-Focus on the ACTUAL STEPS products/services take to reach customers.
+Focus on ${request.companyName}'s REAL business model:
+- How they source inputs (capital for banks, materials for manufacturers, talent for services)
+- How they create value (lending for banks, production for manufacturers, solutions for consultants)
+- How they deliver to customers (branches/digital for banks, logistics for manufacturers, engagements for services)
+- Their actual revenue generation model
 
 CRITICAL FOR CAPACITY DATA:
-- Manufacturing: Use "thousand units/month", "tons/day", "million units/year" 
-- E-commerce/Retail: Use "million packages/day", "orders/hour", "SKUs handled/month"
-- Energy: Use "MW/hour", "barrels/day", "million cubic feet/day"
-- Logistics: Use "TEUs/month" (shipping), "tons/day" (freight), "packages/hour" (last mile)
-- Technology: Use "transactions/second", "TB/day", "requests/minute"
-Always specify the TIME PERIOD - never just "1200 units" but "1200 units/day"
+Base the metrics on what ${request.companyName} ACTUALLY measures and reports. Examples:
+- For banks: branches, ATMs, transactions/day, loans processed/month
+- For manufacturers: units produced/day, production capacity/year
+- For retailers: stores, distribution centers, orders/day
+- For tech companies: users, data processed/day, API calls/second
+Always use metrics relevant to ${request.companyName}'s actual business
 
 Return ONLY a JSON object with comprehensive supply chain and value chain intelligence:
 
@@ -358,8 +395,8 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
   ],
   "key_suppliers": [
     {
-      "supplier_type": "raw materials" or "components" or "services" or "logistics",
-      "supplier_examples": ["company 1", "company 2"],
+      "supplier_type": "Adapt to business: 'funding sources' for banks, 'raw materials' for manufacturers, 'technology partners' for tech, 'talent' for services",
+      "supplier_examples": ["actual supplier/partner names"],
       "geographic_concentration": "region or country",
       "market_share": <decimal, e.g., 0.25 for 25%>,
       "bargaining_power": "low" or "medium" or "high",
@@ -377,10 +414,10 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
   ],
   "capacity_data": [
     {
-      "category": "Be specific to the industry (e.g., for Amazon: 'Fulfillment Centers', 'Delivery Stations', 'Sort Centers')",
-      "capacity": <number representing actual throughput or capacity>,
+      "category": "Adapt to actual business: 'Loan Portfolio' for banks, 'Manufacturing Capacity' for factories, 'Assets Under Management' for funds, 'Store Network' for retail",
+      "capacity": <number representing actual business metric>,
       "utilization": <decimal, e.g., 0.75 for 75%>,
-      "unit": "CRITICAL - Must include time period and be specific! Examples: 'million packages/day', 'tons/hour', 'MW/hour', 'barrels/day', 'vehicles/year', 'TEUs/month', 'million units/quarter', 'thousand transactions/second'. NEVER use just 'units' or 'facilities' without context"
+      "unit": "Business-specific: '$X billion in loans', 'X million transactions/day' for banks, 'X units/year' for manufacturers, '$X billion AUM' for asset managers, 'X stores' for retail"
     }
   ],
   "geography_data": [
@@ -406,7 +443,7 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
 
   "supply_chain_model": {
     "model_type": "e-commerce fulfillment" or "manufacturing hub-and-spoke" or "just-in-time production" or "global sourcing network" or "vertically integrated" or "outsourced network" or "hybrid model",
-    "description": "Specific description of how THIS industry's supply chain works (e.g., for Amazon: 'Multi-tier fulfillment network with 175+ fulfillment centers globally')",
+    "description": "Specific description of how THIS company's supply chain works (e.g., 'Multi-tier distribution network', 'Vertically integrated production', 'Global sourcing network')",
     "core_components": ["component 1", "component 2", "component 3"],
     "value_chain_position": "upstream supplier" or "midstream processor" or "downstream distributor" or "integrated player",
     "key_assets": ["asset type 1", "asset type 2"],
@@ -492,7 +529,7 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
       "tier_name": "Manufacturing" or "Ocean Freight" or "Distribution Centers" or "Fulfillment Centers" or "Last Mile Delivery" etc,
       "tier_position": <1 for origin, higher for downstream>,
       "description": "Specific function in moving products/services to customers",
-      "key_players": ["Amazon Fulfillment (175 centers)", "FedEx", "UPS", "DHL", etc with specifics],
+      "key_players": ["Major logistics provider 1", "Key supplier", "Distribution partner", etc with company-specific details],
       "geographic_concentration": "e.g., 70% in China manufacturing, 30% in Vietnam",
       "capacity_metrics": "1M packages/day" or "50K TEUs/month" or relevant metric,
       "estimated_margin": "X-Y% EBITDA margin",
@@ -505,7 +542,7 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
       "region": "Asia-Pacific" or "North America" or "Europe" etc,
       "supply_chain_elements": ["Raw material sourcing", "Manufacturing", "Assembly"],
       "dominant_countries": ["China (60%)", "Vietnam (20%)", "Thailand (10%)"],
-      "control_entities": ["Foxconn", "TSMC", "Samsung"],
+      "control_entities": ["Major supplier 1", "Key manufacturer", "Strategic partner"],
       "risk_factors": ["Geopolitical tensions", "Labor costs rising"],
       "strategic_importance": "Critical" or "High" or "Medium" or "Low"
     }
@@ -568,7 +605,7 @@ Return ONLY a JSON object with comprehensive supply chain and value chain intell
   }
 }
 
-Provide REAL, SPECIFIC data for ${request.companyName || 'the company'} where available, or realistic industry benchmarks. Focus on actionable intelligence for M&A decisions.`;
+Provide REAL, SPECIFIC data for ${request.companyName || 'the company'} based on current market research. DO NOT use examples from other companies - focus only on the company being analyzed or industry-standard benchmarks. Focus on actionable intelligence for M&A decisions.`;
 
       progressCallback?.(30, 'Fetching supply chain data from Perplexity...');
       
@@ -722,7 +759,7 @@ class EndMarketsProcessor implements JobProcessor {
   ]
 }
 
-IMPORTANT: TAM (Total Addressable Market) represents the realistic revenue opportunity available to this specific company, NOT the entire industry size. For example, if the global e-commerce market is $6 trillion, Amazon's TAM might only be $2-3 trillion based on the segments they serve. Provide real, accurate market data based on current industry research and analysis.`;
+IMPORTANT: TAM (Total Addressable Market) represents the realistic revenue opportunity available to this specific company, NOT the entire industry size. For example, a company may only address 30-50% of the total industry based on their capabilities and target segments. Provide real, accurate market data based on current industry research and analysis.`;
 
       progressCallback?.(30, 'Fetching market data from Perplexity...');
       
@@ -825,13 +862,34 @@ class RegulationsProcessor implements JobProcessor {
     try {
       progressCallback?.(10, 'Starting regulatory analysis...');
       
-      const industryContext = `${request.primaryIndustry || request.companyDescription} industry`;
       const companyName = request.companyName || 'this company';
+      // Extract industry context more intelligently from company description
+      let industryContext = request.primaryIndustry || '';
+      
+      // For banks/financial institutions, ensure proper industry context
+      if (request.companyDescription) {
+        const desc = request.companyDescription.toLowerCase();
+        if (desc.includes('bank') || desc.includes('financial services') || desc.includes('financial institution')) {
+          industryContext = 'banking and financial services industry';
+        } else if (!industryContext) {
+          // Fallback to extracting from description
+          industryContext = `${request.companyDescription} industry`;
+        }
+      }
+      
+      // Ensure we have a valid industry context
+      if (!industryContext || industryContext === 'industry') {
+        industryContext = 'the company\'s industry';
+      }
       
       progressCallback?.(20, 'Researching regulatory landscape...');
       
       // Create Perplexity prompt for dual-table regulatory analysis
-      const prompt = `Analyze the regulatory environment for the ${industryContext} and ${companyName}. Return ONLY a JSON object with TWO sections - general industry regulations and M&A-specific regulatory impacts:
+      const prompt = `Analyze the regulatory environment specifically for ${companyName} operating in the ${industryContext}. 
+      
+Company Context: ${request.companyDescription || 'Operating company'}
+
+Return ONLY a JSON object with TWO sections - general industry regulations and M&A-specific regulatory impacts for this SPECIFIC company and industry:
 
 {
   "industry_regulations": [
@@ -858,10 +916,12 @@ class RegulationsProcessor implements JobProcessor {
   ]
 }
 
-For industry_regulations, include 8-12 KEY regulations that significantly impact operations in this industry.
-For ma_regulatory_impacts, include 5-8 regulations that specifically affect M&A transactions, mergers, acquisitions, or investment deals in this industry.
+For industry_regulations, include 8-12 KEY regulations that significantly impact operations in this specific industry. For banks, focus on Basel III/IV, capital requirements, lending regulations, anti-money laundering, etc. For tech companies, focus on data privacy, platform regulations, etc.
 
-Focus on REAL, CURRENT regulations with accurate details. Be specific about regulatory bodies and jurisdictions.`;
+For ma_regulatory_impacts, include 5-8 regulations that specifically affect M&A transactions, mergers, acquisitions, or investment deals in this industry. For banks, include APRA approval requirements, competition reviews, foreign investment restrictions, etc.
+
+Focus on REAL, CURRENT regulations with accurate details. Be specific about regulatory bodies and jurisdictions relevant to ${companyName}.
+DO NOT provide generic tech regulations for non-tech companies. Match regulations to the actual industry.`;
 
       progressCallback?.(30, 'Fetching regulatory data from Perplexity...');
       
